@@ -1,3 +1,5 @@
+// server.js
+
 const express = require('express');
 const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
@@ -7,7 +9,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const DB_PATH = path.join(__dirname, 'inventory.db');
 
-// Open SQLite
+// ────────────────────────────────────────────────────────────────────────────
+// 1) Open (or create) the SQLite database
+// ────────────────────────────────────────────────────────────────────────────
 const db = new sqlite3.Database(DB_PATH, (err) => {
   if (err) {
     console.error('Failed to connect to SQLite:', err);
@@ -16,10 +20,17 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
   console.log('Connected to SQLite database.');
 });
 
-app.use(cors());
-app.use(express.json());
+// ────────────────────────────────────────────────────────────────────────────
+// 2) Middleware
+// ────────────────────────────────────────────────────────────────────────────
+app.use(cors());            // allow cross‐origin requests from your frontend
+app.use(express.json());    // parse JSON bodies (needed for POST requests)
 
-// 1) GET /products
+// ────────────────────────────────────────────────────────────────────────────
+// 3) GET /products
+//    Returns an array of all product names (FD_NAME) from the Products table
+//    Example response: ["Amla", "Apple – Green", "Apple – Red", …]
+// ────────────────────────────────────────────────────────────────────────────
 app.get('/products', (req, res) => {
   const sql = `SELECT FD_NAME FROM Products ORDER BY FD_NAME;`;
   db.all(sql, [], (err, rows) => {
@@ -27,11 +38,29 @@ app.get('/products', (req, res) => {
       console.error('Error querying Products:', err);
       return res.status(500).json({ error: 'DB error fetching products' });
     }
-    res.json(rows.map(r => r.FD_NAME));
+    // rows will be like [{ FD_NAME: "Amla" }, { FD_NAME: "Apple – Green" }, …]
+    const productNames = rows.map(r => r.FD_NAME);
+    res.json(productNames);
   });
 });
 
-// 2) GET /inward
+// ────────────────────────────────────────────────────────────────────────────
+// 4) GET /inward
+//    Returns all rows from InwardTransactions, ordered by DateTime DESC
+//    Example response (array of objects):
+//    [
+//      {
+//        "SR_No": 6,
+//        "DateTime": "2025-05-30 11:30:00",
+//        "FD_NAME": "Amla",
+//        "Pouch_Date": "2025-03-04",
+//        "Num_Pouches": 3,
+//        "Qty_GM": 300,
+//        "Remarks": "nil"
+//      },
+//      …more rows…
+//    ]
+// ────────────────────────────────────────────────────────────────────────────
 app.get('/inward', (req, res) => {
   const sql = `
     SELECT
@@ -54,7 +83,23 @@ app.get('/inward', (req, res) => {
   });
 });
 
-// 3) GET /dispatch
+// ────────────────────────────────────────────────────────────────────────────
+// 5) GET /dispatch
+//    Returns all rows from DispatchTransactions, ordered by DateTime DESC
+//    Example response (array of objects):
+//    [
+//      {
+//        "SR_No": 5,
+//        "DateTime": "2025-05-28 11:30:00",
+//        "FD_NAME": "Bael",
+//        "Pouch_Date": "2024-12-31",
+//        "Num_Pouches": 5,
+//        "Qty_GM": 5000,
+//        "Remarks": null
+//      },
+//      …more rows…
+//    ]
+// ────────────────────────────────────────────────────────────────────────────
 app.get('/dispatch', (req, res) => {
   const sql = `
     SELECT
@@ -77,7 +122,24 @@ app.get('/dispatch', (req, res) => {
   });
 });
 
-// 4) GET /balance
+// ────────────────────────────────────────────────────────────────────────────
+// 6) GET /balance
+//    Returns a live aggregation of inward vs dispatch for each product.
+//    Each object has: FD_NAME, Inward_Pouches, Inward_GM, Used_Pouches, Used_GM, Bal_Pouches, Bal_GM
+//    Example response:
+//    [
+//      {
+//        "FD_NAME": "Amla",
+//        "Inward_Pouches": 17,
+//        "Inward_GM": 15200,
+//        "Used_Pouches": 5,
+//        "Used_GM": 5000,
+//        "Bal_Pouches": 12,
+//        "Bal_GM": 10200
+//      },
+//      …more rows…
+//    ]
+// ────────────────────────────────────────────────────────────────────────────
 app.get('/balance', (req, res) => {
   const sql = `
     SELECT
@@ -103,6 +165,69 @@ app.get('/balance', (req, res) => {
   });
 });
 
+// ────────────────────────────────────────────────────────────────────────────
+// 7) POST /inward
+//    Inserts a new row into InwardTransactions.
+//    Expects JSON body:
+//    {
+//      DateTime: "2025-06-05 14:30:00",
+//      FD_NAME: "Amla",
+//      Pouch_Date: "2025-06-05",
+//      Num_Pouches: 2,
+//      Qty_GM: 200,
+//      Remarks: "Restocked"
+//    }
+//    Returns: { success: true, id: <new_row_id> }
+// ────────────────────────────────────────────────────────────────────────────
+app.post('/inward', (req, res) => {
+  const { DateTime, FD_NAME, Pouch_Date, Num_Pouches, Qty_GM, Remarks } = req.body;
+  const sql = `
+    INSERT INTO InwardTransactions
+      (DateTime, FD_NAME, Pouch_Date, Num_Pouches, Qty_GM, Remarks)
+    VALUES (?, ?, ?, ?, ?, ?);
+  `;
+  db.run(sql, [ DateTime, FD_NAME, Pouch_Date, Num_Pouches, Qty_GM, Remarks ], function(err) {
+    if (err) {
+      console.error('Error inserting inward:', err);
+      return res.status(500).json({ error: 'DB error inserting inward' });
+    }
+    res.status(201).json({ success: true, id: this.lastID });
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// 8) POST /dispatch
+//    Inserts a new row into DispatchTransactions.
+//    Expects JSON body:
+//    {
+//      DateTime: "2025-06-05 15:00:00",
+//      FD_NAME: "Bael",
+//      Pouch_Date: "2025-06-05",
+//      Num_Pouches: 3,
+//      Qty_GM: 3000,
+//      Remarks: "Dispatched to Store"
+//    }
+//    Returns: { success: true, id: <new_row_id> }
+// ────────────────────────────────────────────────────────────────────────────
+app.post('/dispatch', (req, res) => {
+  const { DateTime, FD_NAME, Pouch_Date, Num_Pouches, Qty_GM, Remarks } = req.body;
+  const sql = `
+    INSERT INTO DispatchTransactions
+      (DateTime, FD_NAME, Pouch_Date, Num_Pouches, Qty_GM, Remarks)
+    VALUES (?, ?, ?, ?, ?, ?);
+  `;
+  db.run(sql, [ DateTime, FD_NAME, Pouch_Date, Num_Pouches, Qty_GM, Remarks ], function(err) {
+    if (err) {
+      console.error('Error inserting dispatch:', err);
+      return res.status(500).json({ error: 'DB error inserting dispatch' });
+    }
+    res.status(201).json({ success: true, id: this.lastID });
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// 9) Start the server
+// ────────────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`Server is running on http://0.0.0.0:${PORT}`);
 });
