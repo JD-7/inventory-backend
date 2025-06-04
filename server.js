@@ -143,16 +143,16 @@ app.get('/dispatch', (req, res) => {
 app.get('/balance', (req, res) => {
   const sql = `
     SELECT
-      P.FD_NAME AS FD_NAME,
+      P.FD_NAME            AS FD_NAME,
       IFNULL(SUM(i.Num_Pouches), 0) AS Inward_Pouches,
-      IFNULL(SUM(i.Qty_GM), 0)       AS Inward_GM,
-      IFNULL(SUM(d.Num_Pouches), 0)  AS Used_Pouches,
-      IFNULL(SUM(d.Qty_GM), 0)       AS Used_GM,
-      IFNULL(SUM(i.Num_Pouches), 0) - IFNULL(SUM(d.Num_Pouches), 0) AS Bal_Pouches,
-      IFNULL(SUM(i.Qty_GM), 0)      - IFNULL(SUM(d.Qty_GM), 0)      AS Bal_GM
+      IFNULL(SUM(i.Qty_GM),       0) AS Inward_GM,
+      IFNULL(SUM(d.Num_Pouches),  0) AS Used_Pouches,
+      IFNULL(SUM(d.Qty_GM),       0) AS Used_GM,
+      IFNULL(SUM(i.Num_Pouches),  0) - IFNULL(SUM(d.Num_Pouches), 0) AS Bal_Pouches,
+      IFNULL(SUM(i.Qty_GM),       0) - IFNULL(SUM(d.Qty_GM),       0) AS Bal_GM
     FROM Products P
-    LEFT JOIN InwardTransactions i ON i.FD_NAME = P.FD_NAME
-    LEFT JOIN DispatchTransactions d ON d.FD_NAME = P.FD_NAME
+    LEFT JOIN InwardTransactions    i ON i.FD_NAME = P.FD_NAME
+    LEFT JOIN DispatchTransactions  d ON d.FD_NAME = P.FD_NAME
     GROUP BY P.FD_NAME
     ORDER BY P.FD_NAME;
   `;
@@ -164,6 +164,7 @@ app.get('/balance', (req, res) => {
     res.json(rows);
   });
 });
+
 
 // ────────────────────────────────────────────────────────────────────────────
 // 7) POST /inward
@@ -179,6 +180,7 @@ app.get('/balance', (req, res) => {
 //    }
 //    Returns: { success: true, id: <new_row_id> }
 // ────────────────────────────────────────────────────────────────────────────
+// POST /inward  →  inserts into InwardTransactions
 app.post('/inward', (req, res) => {
   const { DateTime, FD_NAME, Pouch_Date, Num_Pouches, Qty_GM, Remarks } = req.body;
   const sql = `
@@ -186,7 +188,9 @@ app.post('/inward', (req, res) => {
       (DateTime, FD_NAME, Pouch_Date, Num_Pouches, Qty_GM, Remarks)
     VALUES (?, ?, ?, ?, ?, ?);
   `;
-  db.run(sql, [ DateTime, FD_NAME, Pouch_Date, Num_Pouches, Qty_GM, Remarks ], function(err) {
+  db.run(sql,
+         [ DateTime, FD_NAME, Pouch_Date, Num_Pouches, Qty_GM, Remarks ],
+         function(err) {
     if (err) {
       console.error('Error inserting inward:', err);
       return res.status(500).json({ error: 'DB error inserting inward' });
@@ -195,20 +199,7 @@ app.post('/inward', (req, res) => {
   });
 });
 
-// ────────────────────────────────────────────────────────────────────────────
-// 8) POST /dispatch
-//    Inserts a new row into DispatchTransactions.
-//    Expects JSON body:
-//    {
-//      DateTime: "2025-06-05 15:00:00",
-//      FD_NAME: "Bael",
-//      Pouch_Date: "2025-06-05",
-//      Num_Pouches: 3,
-//      Qty_GM: 3000,
-//      Remarks: "Dispatched to Store"
-//    }
-//    Returns: { success: true, id: <new_row_id> }
-// ────────────────────────────────────────────────────────────────────────────
+// POST /dispatch  →  inserts into DispatchTransactions
 app.post('/dispatch', (req, res) => {
   const { DateTime, FD_NAME, Pouch_Date, Num_Pouches, Qty_GM, Remarks } = req.body;
   const sql = `
@@ -216,7 +207,9 @@ app.post('/dispatch', (req, res) => {
       (DateTime, FD_NAME, Pouch_Date, Num_Pouches, Qty_GM, Remarks)
     VALUES (?, ?, ?, ?, ?, ?);
   `;
-  db.run(sql, [ DateTime, FD_NAME, Pouch_Date, Num_Pouches, Qty_GM, Remarks ], function(err) {
+  db.run(sql,
+         [ DateTime, FD_NAME, Pouch_Date, Num_Pouches, Qty_GM, Remarks ],
+         function(err) {
     if (err) {
       console.error('Error inserting dispatch:', err);
       return res.status(500).json({ error: 'DB error inserting dispatch' });
