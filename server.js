@@ -1,4 +1,3 @@
-// server.js
 const express = require('express');
 const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
@@ -8,8 +7,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const DB_PATH = path.join(__dirname, 'inventory.db');
 
-// Open SQLite database
-const db = new sqlite3.Database(DB_PATH, err => {
+// Open SQLite
+const db = new sqlite3.Database(DB_PATH, (err) => {
   if (err) {
     console.error('Failed to connect to SQLite:', err);
     process.exit(1);
@@ -20,7 +19,7 @@ const db = new sqlite3.Database(DB_PATH, err => {
 app.use(cors());
 app.use(express.json());
 
-// GET /products → list of FD_NAME
+// 1) GET /products
 app.get('/products', (req, res) => {
   const sql = `SELECT FD_NAME FROM Products ORDER BY FD_NAME;`;
   db.all(sql, [], (err, rows) => {
@@ -32,7 +31,7 @@ app.get('/products', (req, res) => {
   });
 });
 
-// GET /inward → all rows from InwardTransactions (descending by DateTime)
+// 2) GET /inward
 app.get('/inward', (req, res) => {
   const sql = `
     SELECT
@@ -55,7 +54,7 @@ app.get('/inward', (req, res) => {
   });
 });
 
-// GET /dispatch → all rows from DispatchTransactions (descending)
+// 3) GET /dispatch
 app.get('/dispatch', (req, res) => {
   const sql = `
     SELECT
@@ -78,7 +77,7 @@ app.get('/dispatch', (req, res) => {
   });
 });
 
-// GET /balance → live computed balances per product
+// 4) GET /balance
 app.get('/balance', (req, res) => {
   const sql = `
     SELECT
