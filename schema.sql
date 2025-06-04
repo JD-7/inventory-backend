@@ -1,0 +1,29 @@
+-- schema.sql
+
+CREATE TABLE IF NOT EXISTS Products (
+  FD_NAME TEXT PRIMARY KEY
+);
+
+CREATE TABLE IF NOT EXISTS InwardTransactions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  SR_No      INTEGER,
+  DateTime   TEXT NOT NULL,
+  FD_NAME    TEXT NOT NULL,
+  Pouch_Date TEXT,
+  Num_Pouches INTEGER,
+  Qty_GM     INTEGER,
+  Remarks    TEXT,
+  FOREIGN KEY(FD_NAME) REFERENCES Products(FD_NAME)
+);
+
+CREATE TABLE IF NOT EXISTS DispatchTransactions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  SR_No      INTEGER,
+  DateTime   TEXT NOT NULL,
+  FD_NAME    TEXT NOT NULL,
+  Pouch_Date TEXT,
+  Num_Pouches INTEGER,
+  Qty_GM     INTEGER,
+  Remarks    TEXT,
+  FOREIGN KEY(FD_NAME) REFERENCES Products(FD_NAME)
+);
