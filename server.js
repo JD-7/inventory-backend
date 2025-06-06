@@ -46,20 +46,53 @@ app.get('/products', (req, res) => {
 
 // POST /products -- Add new product to the Products table
 app.post('/products', (req, res) => {
-  const { FD_NAME } = req.body || {};
-  if (!FD_NAME || typeof FD_NAME !== 'string' || !FD_NAME.trim()) {
-    return res.status(400).json({ error: 'FD_NAME is required.' });
+  const { FD_NAME } = req.body;
+  
+  // Basic validation
+  if (!FD_NAME || FD_NAME.trim() === '') {
+    return res.status(400).json({ error: 'Product name is required' });
   }
-  const cleanName = FD_NAME.trim();
-  const sql = `INSERT INTO Products (FD_NAME) VALUES (?)`;
-  db.run(sql, [cleanName], function(err) {
-    if (err) {
-      if (err.message && err.message.includes('UNIQUE')) {
-        return res.status(409).json({ error: 'Product already exists.' });
+
+  // Insert into Products table
+  db.run(
+    'INSERT INTO Products (FD_NAME) VALUES (?)',
+    [FD_NAME.trim()],
+    function(err) {
+      if (err) {
+        // Handle unique constraint error
+        if (err.message.includes('UNIQUE constraint failed')) {
+          return res.status(409).json({ error: 'Product already exists' });
+        }
+        console.error('Error inserting product:', err);
+        return res.status(500).json({ error: 'Failed to add product' });
       }
-      return res.status(500).json({ error: 'Database error.' });
+      
+      // Return the newly created row
+      res.status(201).json({
+        id: this.lastID,
+        FD_NAME: FD_NAME.trim()
+      });
     }
-    res.status(201).json({ id: this.lastID, FD_NAME: cleanName });
+  );
+});
+
+// DELETE /products/:fd_name -- Delete a product by FD_NAME (case-sensitive)
+app.delete('/products/:fd_name', (req, res) => {
+  const fd_name = decodeURIComponent(req.params.fd_name);
+
+  // Optional: Check if the product is referenced in any transactions before deleting.
+  // For now, let's allow deleting any product.
+  const sql = `DELETE FROM Products WHERE FD_NAME = ?`;
+  db.run(sql, [fd_name], function(err) {
+    if (err) {
+      console.error('Error deleting product:', err);
+      return res.status(500).json({ error: 'DB error deleting product.' });
+    }
+    if (this.changes === 0) {
+      // No rows deleted (not found)
+      return res.status(404).json({ error: 'Product not found.' });
+    }
+    res.status(200).json({ message: 'Product deleted.', FD_NAME: fd_name });
   });
 });
 
