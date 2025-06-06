@@ -44,6 +44,36 @@ app.get('/products', (req, res) => {
   });
 });
 
+//  ─────────────────────────────────────────────────────────────────────────────
+//  4) POST /products  → Create a brand-new product name
+//  ─────────────────────────────────────────────────────────────────────────────
+app.post('/products', (req, res) => {
+  const { FD_NAME } = req.body || {};
+
+  // 1) Basic validation: must not be empty/null
+  if (!FD_NAME || typeof FD_NAME !== 'string' || !FD_NAME.trim()) {
+    return res.status(400).json({ error: 'FD_NAME is required and must be non-empty.' });
+  }
+
+  const cleanName = FD_NAME.trim();
+
+  // 2) Insert into Products table
+  const sql = `INSERT INTO Products (FD_NAME) VALUES (?)`;
+  db.run(sql, [cleanName], function(err) {
+    if (err) {
+      // If UNIQUE constraint fails → duplicate name
+      if (err.message.includes('UNIQUE') || err.code === 'SQLITE_CONSTRAINT') {
+        return res.status(409).json({ error: `Product name "${cleanName}" already exists.` });
+      }
+      console.error('Error inserting new product:', err);
+      return res.status(500).json({ error: 'DB error inserting new product.' });
+    }
+    // 3) On success, return the newly created row ID and name
+    res.status(201).json({ id: this.lastID, FD_NAME: cleanName });
+  });
+});
+
+
 // ────────────────────────────────────────────────────────────────────────────
 // 4) GET /inward
 //    Returns all rows from InwardTransactions, ordered by DateTime DESC
